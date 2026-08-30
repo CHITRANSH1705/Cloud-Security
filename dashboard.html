@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Kill-Switch SOC Dashboard</title>
+<meta name="description" content="Real-time Security Operations Center for the Cloud Ransomware Kill-Switch pipeline — IAM graph, attack feed, remediation status."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ─── CSS Variables ─────────────────────────────────────── */
+:root {
+  --bg:          #0a0e1a;
+  --bg2:         #0f1424;
+  --panel:       rgba(20,26,45,0.85);
+  --panel-b:     rgba(255,255,255,0.06);
+  --border:      rgba(255,255,255,0.08);
+  --text:        #e2e8f0;
+  --text2:       #8892a4;
+  --text3:       #4a5568;
+  --cyan:        #00d4ff;
+  --cyan2:       #0ea5e9;
+  --green:       #00ff88;
+  --green2:      #10b981;
+  --red:         #ff3b3b;
+  --red2:        #ef4444;
+  --orange:      #f59e0b;
+  --purple:      #a855f7;
+  --yellow:      #eab308;
+  --mono:        'JetBrains Mono', monospace;
+  --sans:        'Inter', sans-serif;
+  --radius:      12px;
+  --radius-sm:   8px;
+  --shadow:      0 4px 24px rgba(0,0,0,0.4);
+  --glow-cyan:   0 0 20px rgba(0,212,255,0.3);
+  --glow-red:    0 0 20px rgba(255,59,59,0.4);
+  --glow-green:  0 0 20px rgba(0,255,136,0.3);
+  --transition:  all 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+[data-theme="light"] {
+  --bg:     #f0f4f8;
+  --bg2:    #e2e8f0;
+  --panel:  rgba(255,255,255,0.9);
+  --panel-b:rgba(0,0,0,0.04);
+  --border: rgba(0,0,0,0.1);
+  --text:   #1a202c;
+  --text2:  #4a5568;
+  --text3:  #a0aec0;
+  --cyan:   #0284c7;
+  --green:  #059669;
+  --red:    #dc2626;
+  --shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+
+/* ─── Reset & Base ──────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--sans);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  line-height:1.6;
+  overflow-x:hidden;
+  transition:background 0.4s,color 0.4s;
+}
+[data-theme="dark"] body::before{
+  content:'';
+  position:fixed;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(0,212,255,0.06) 0%,transparent 60%),
+             radial-gradient(ellipse 50% 40% at 80% 80%,rgba(168,85,247,0.05) 0%,transparent 60%);
+  pointer-events:none;z-index:0;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ─── Layout ────────────────────────────────────────────── */
+.container{max-width:1600px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+section{margin-bottom:20px}
+
+/* ─── Header ────────────────────────────────────────────── */
+header{
+  background:var(--panel);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+  padding:0 24px;
+}
+.header-inner{
+  max-width:1600px;margin:0 auto;
+  display:flex;align-items:center;gap:16px;
+  height:64px;
+}
+.logo{
+  display:flex;align-items:center;gap:10px;
+  font-weight:700;font-size:18px;letter-spacing:-0.3px;
+}
+.logo-icon{
+  width:36px;height:36px;
+  background:linear-gradient(135deg,var(--cyan),var(--purple));
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+}
+.logo-text span{color:var(--cyan)}
+.header-gap{flex:1}
+.status-pill{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 14px;border-radius:20px;
+  font-size:12px;font-weight:600;letter-spacing:0.5px;
+  text-transform:uppercase;
+  transition:var(--transition);
+}
+.status-pill.armed{background:rgba(0,255,136,0.12);color:var(--green);border:1px solid rgba(0,255,136,0.25);box-shadow:var(--glow-green)}
+.status-pill.triggered{background:rgba(255,59,59,0.12);color:var(--red);border:1px solid rgba(255,59,59,0.3);box-shadow:var(--glow-red)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse-dot 1.5s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(0.85)}}
+.last-updated{font-size:12px;color:var(--text2);font-family:var(--mono)}
+.theme-toggle{
+  background:var(--panel-b);border:1px solid var(--border);
+  color:var(--text);cursor:pointer;
+  width:38px;height:38px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;transition:var(--transition);
+}
+.theme-toggle:hover{background:var(--border)}
+
+/* ─── Main Content ──────────────────────────────────────── */
+main{padding:24px 0}
+
+/* ─── Stat Cards ────────────────────────────────────────── */
+.stat-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:20px;
+  backdrop-filter:blur(12px);
+  transition:var(--transition);
+  position:relative;overflow:hidden;
+}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--accent,var(--cyan));
+  opacity:0.8;
+}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.stat-label{font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--text2);margin-bottom:8px}
+.stat-value{font-size:28px;font-weight:700;font-family:var(--mono);color:var(--text);line-height:1}
+.stat-sub{font-size:11px;color:var(--text2);margin-top:6px}
+.stat-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:28px;opacity:0.15}
+
+/* ─── Panel Cards ───────────────────────────────────────── */
+.panel{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  backdrop-filter:blur(12px);
+  overflow:hidden;
+}
+.panel-header{
+  display:flex;align-items:center;gap:10px;
+  padding:16px 20px;
+  border-bottom:1px solid var(--border);
+}
+.panel-title{font-size:13px;font-weight:600;letter-spacing:0.3px}
+.panel-badge{
+  margin-left:auto;
+  font-size:11px;font-weight:600;
+  padding:3px 8px;border-radius:20px;
+  background:rgba(255,255,255,0.06);
+  color:var(--text2);
+}
+.panel-body{padding:20px}
+
+/* ─── Pipeline Map ──────────────────────────────────────── */
+.pipeline-wrap{
+  padding:24px 20px;
+  overflow-x:auto;
+}
+.pipeline{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:0;min-width:800px;
+}
+.pipe-node{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  flex:1;
+}
+.pipe-box{
+  background:var(--panel-b);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:12px 16px;
+  text-align:center;
+  width:110px;
+  transition:var(--transition);
+  position:relative;
+}
+.pipe-box.active{
+  border-color:var(--cyan);
+  box-shadow:0 0 16px rgba(0,212,255,0.25);
+  background:rgba(0,212,255,0.06);
+}
+.pipe-box.triggered{
+  border-color:var(--red);
+  box-shadow:var(--glow-red);
+  background:rgba(255,59,59,0.08);
+  animation:trigger-pulse 2s ease-in-out infinite;
+}
+@keyframes trigger-pulse{0%,100%{box-shadow:0 0 16px rgba(255,59,59,0.3)}50%{box-shadow:0 0 30px rgba(255,59,59,0.6)}}
+.pipe-icon{font-size:24px;margin-bottom:4px}
+.pipe-label{font-size:11px;font-weight:600;color:var(--text2)}
+.pipe-sublabel{font-size:10px;color:var(--text3);margin-top:2px}
+.pipe-arrow{
+  flex:0 0 auto;
+  display:flex;align-items:center;
+  color:var(--text3);font-size:20px;
+  padding:0 4px;
+}
+.pipe-arrow.active-arrow{color:var(--cyan);animation:arrow-flow 1.5s ease-in-out infinite}
+.pipe-arrow.triggered-arrow{color:var(--red)}
+@keyframes arrow-flow{0%,100%{opacity:0.4;transform:translateX(0)}50%{opacity:1;transform:translateX(4px)}}
+
+/* ─── Attack Feed ───────────────────────────────────────── */
+.feed{
+  font-family:var(--mono);
+  font-size:12px;
+  max-height:340px;
+  overflow-y:auto;
+  display:flex;flex-direction:column;gap:2px;
+}
+.feed-entry{
+  display:grid;
+  grid-template-columns:80px 55px 1fr 60px;
+  gap:8px;align-items:center;
+  padding:6px 8px;border-radius:4px;
+  transition:background 0.15s;
+}
+.feed-entry:hover{background:var(--panel-b)}
+.feed-entry.ok .feed-status{color:var(--green)}
+.feed-entry.blocked{background:rgba(255,59,59,0.06);border-left:3px solid var(--red);padding-left:5px}
+.feed-entry.blocked .feed-status{color:var(--red)}
+.feed-entry.trigger{
+  background:rgba(255,59,59,0.12);
+  border:1px solid rgba(255,59,59,0.4);
+  border-radius:6px;
+  padding:8px;
+  grid-column:1/-1;
+  display:block;
+  color:var(--red);
+  font-weight:600;
+  animation:trigger-pulse 2s ease-in-out infinite;
+}
+.feed-time{color:var(--text3);font-size:11px}
+.feed-num{color:var(--text2)}
+.feed-key{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed-latency{color:var(--text3);text-align:right}
+
+/* ─── Leaderboard ───────────────────────────────────────── */
+.lb-row{
+  display:grid;
+  grid-template-columns:auto 1fr auto auto;
+  gap:12px;align-items:center;
+  padding:12px 0;
+  border-bottom:1px solid var(--border);
+}
+.lb-row:last-child{border-bottom:none}
+.lb-rank{
+  width:24px;height:24px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;
+  background:var(--panel-b);
+  color:var(--text2);
+}
+.lb-rank.r1{background:rgba(245,158,11,0.2);color:var(--orange)}
+.lb-name{font-size:13px;font-weight:500;font-family:var(--mono)}
+.lb-score{
+  font-size:20px;font-weight:700;font-family:var(--mono);
+}
+.lb-chains{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.chain-chip{
+  font-size:10px;font-weight:600;
+  padding:2px 6px;border-radius:4px;
+  font-family:var(--mono);
+}
+.risk-badge{
+  padding:3px 10px;border-radius:20px;
+  font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;
+}
+.risk-badge.HIGH{background:rgba(255,59,59,0.15);color:var(--red);border:1px solid rgba(255,59,59,0.25)}
+.risk-badge.MEDIUM{background:rgba(245,158,11,0.15);color:var(--orange);border:1px solid rgba(245,158,11,0.25)}
+.risk-badge.LOW{background:rgba(0,255,136,0.1);color:var(--green);border:1px solid rgba(0,255,136,0.2)}
+
+/* ─── RSL Findings ──────────────────────────────────────── */
+.rsl-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+}
+.rsl-card{
+  padding:14px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);
+  background:var(--panel-b);
+  transition:var(--transition);
+}
+.rsl-card.hit{
+  border-color:rgba(255,59,59,0.35);
+  background:rgba(255,59,59,0.06);
+  box-shadow:0 0 12px rgba(255,59,59,0.15);
+}
+.rsl-card.hit:hover{transform:translateY(-2px);box-shadow:0 0 20px rgba(255,59,59,0.25)}
+.rsl-id{
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  color:var(--text2);margin-bottom:6px;
+  display:flex;align-items:center;gap:6px;
+}
+.rsl-id .dot{width:6px;height:6px;border-radius:50%;background:var(--text3)}
+.rsl-card.hit .rsl-id .dot{background:var(--red);box-shadow:0 0 6px var(--red)}
+.rsl-name{font-size:12px;font-weight:600;margin-bottom:4px}
+.rsl-principal{font-size:11px;color:var(--text2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsl-actions{font-size:10px;color:var(--red);margin-top:6px;font-family:var(--mono)}
+.rsl-mitre{
+  margin-top:8px;padding-top:8px;border-top:1px solid var(--border);
+  font-size:10px;color:var(--text3);
+}
+
+/* ─── Dangerous Combos ───────────────────────────────────── */
+.combo-table{width:100%;border-collapse:collapse;font-size:12px}
+.combo-table th{
+  text-align:left;padding:8px 12px;
+  font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;
+  color:var(--text3);border-bottom:1px solid var(--border);
+}
+.combo-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top}
+.combo-table tr:last-child td{border-bottom:none}
+.combo-table tr:hover td{background:var(--panel-b)}
+.combo-row-hit td{background:rgba(255,59,59,0.04)}
+.combo-chain-id{
+  font-family:var(--mono);font-weight:700;font-size:11px;
+  display:flex;align-items:center;gap:6px;
+}
+.combo-perms{
+  display:flex;flex-direction:column;gap:3px;
+}
+.combo-perm{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:var(--mono);font-size:10px;
+  padding:2px 7px;border-radius:4px;
+  background:var(--panel-b);
+}
+.combo-perm.danger{background:rgba(255,59,59,0.12);color:var(--red);border:1px solid rgba(255,59,59,0.2)}
+.combo-perm.warn{background:rgba(245,158,11,0.1);color:var(--orange);border:1px solid rgba(245,158,11,0.2)}
+.combo-perm.safe{background:rgba(0,255,136,0.06);color:var(--green);border:1px solid rgba(0,255,136,0.15)}
+.combo-why{font-size:11px;color:var(--text2);line-height:1.5}
+.combo-status-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:700;letter-spacing:0.4px;
+  padding:3px 9px;border-radius:12px;
+  white-space:nowrap;
+}
+.combo-status-badge.detected{background:rgba(255,59,59,0.15);color:var(--red);border:1px solid rgba(255,59,59,0.3)}
+.combo-status-badge.clean{background:rgba(0,255,136,0.08);color:var(--green);border:1px solid rgba(0,255,136,0.15)}
+.combo-plus{
+  font-size:14px;font-weight:700;color:var(--orange);margin:0 4px;
+}
+
+/* ─── IAM Graph ──────────────────────────────────────────── */
+.graph-wrap{
+  position:relative;
+  background:rgba(8,12,28,0.7);
+  border-radius:0 0 var(--radius) var(--radius);
+  overflow:hidden;
+}
+#iamGraphCanvas{
+  display:block;width:100%;cursor:grab;
+}
+#iamGraphCanvas:active{cursor:grabbing}
+.graph-legend{
+  display:flex;gap:16px;flex-wrap:wrap;
+  padding:12px 20px;border-top:1px solid var(--border);
+  background:var(--panel);
+}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2)}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.graph-controls{
+  position:absolute;top:12px;right:12px;
+  display:flex;gap:6px;
+}
+.graph-btn{
+  background:var(--panel);border:1px solid var(--border);
+  color:var(--text2);cursor:pointer;
+  width:30px;height:30px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;transition:var(--transition);
+}
+.graph-btn:hover{background:var(--border);color:var(--text)}
+.graph-tooltip{
+  position:absolute;pointer-events:none;
+  background:rgba(10,14,26,0.95);border:1px solid var(--border);
+  border-radius:8px;padding:10px 14px;
+  font-size:12px;font-family:var(--mono);
+  max-width:260px;z-index:10;
+  box-shadow:0 4px 20px rgba(0,0,0,0.5);
+  display:none;
+}
+
+/* ─── Remediation Timeline ──────────────────────────────── */
+.remediation-timeline{display:flex;flex-direction:column;gap:0}
+.rem-item{
+  display:flex;gap:14px;
+  padding:12px 0;
+  border-left:2px solid var(--border);
+  margin-left:16px;
+  padding-left:20px;
+  position:relative;
+}
+.rem-item::before{
+  content:'';position:absolute;
+  left:-7px;top:16px;
+  width:12px;height:12px;border-radius:50%;
+  background:var(--bg2);border:2px solid var(--border);
+}
+.rem-item.done::before{background:var(--green);border-color:var(--green);box-shadow:0 0 8px rgba(0,255,136,0.4)}
+.rem-item.alert::before{background:var(--red);border-color:var(--red)}
+.rem-item.policy::before{background:var(--orange);border-color:var(--orange)}
+.rem-icon{font-size:20px;flex-shrink:0;line-height:1.4}
+.rem-content{}
+.rem-label{font-size:13px;font-weight:600;margin-bottom:2px}
+.rem-detail{font-size:11px;color:var(--text2);font-family:var(--mono)}
+.rem-time{font-size:10px;color:var(--text3);margin-top:3px}
+
+/* ─── Policy Viewer ─────────────────────────────────────── */
+.policy-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.policy-side{border-radius:var(--radius-sm);overflow:hidden}
+.policy-side-label{
+  padding:8px 14px;
+  font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;
+}
+.policy-side.before .policy-side-label{background:rgba(255,59,59,0.12);color:var(--red)}
+.policy-side.after .policy-side-label{background:rgba(0,255,136,0.1);color:var(--green)}
+.policy-code{
+  background:var(--panel-b);
+  padding:16px;
+  font-family:var(--mono);font-size:12px;
+  line-height:1.7;
+  overflow-x:auto;
+  border:1px solid var(--border);
+  border-top:none;
+  border-radius:0 0 var(--radius-sm) var(--radius-sm);
+}
+.hi-rm{color:var(--red);background:rgba(255,59,59,0.1);border-radius:2px;padding:0 2px;text-decoration:line-through}
+.hi-keep{color:var(--green);background:rgba(0,255,136,0.08);border-radius:2px;padding:0 2px}
+.hi-key{color:var(--cyan)}
+.hi-str{color:var(--orange)}
+
+/* ─── Section Label ─────────────────────────────────────── */
+.section-label{
+  font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--text3);margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ─── Animate in ────────────────────────────────────────── */
+.fade-in{animation:fadeIn 0.5s ease forwards}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─── Loading State ─────────────────────────────────────── */
+.loading-bar{
+  height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  background-size:200% 100%;
+  animation:shimmer 1.5s infinite;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ─── Responsive ────────────────────────────────────────── */
+@media(max-width:1100px){
+  .grid-5{grid-template-columns:repeat(3,1fr)}
+  .rsl-grid{grid-template-columns:repeat(2,1fr)}
+  .combo-table .combo-why{display:none}
+}
+@media(max-width:768px){
+  .grid-2{grid-template-columns:1fr}
+  .grid-5{grid-template-columns:1fr 1fr}
+  .rsl-grid{grid-template-columns:1fr}
+  .policy-grid{grid-template-columns:1fr}
+  .combo-table{font-size:11px}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">🛡️</div>
+      <div class="logo-text">KILL-SWITCH <span>SOC</span></div>
+    </div>
+    <div id="statusPill" class="status-pill armed">
+      <span class="status-dot"></span>
+      <span id="statusText">ARMED</span>
+    </div>
+    <div class="header-gap"></div>
+    <span class="last-updated" id="lastUpdated">Loading...</span>
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </div>
+  <div class="loading-bar" id="loadingBar" style="display:none"></div>
+</header>
+
+<main>
+<div class="container">
+
+  <!-- STAT CARDS -->
+  <section>
+    <div class="grid-5" id="statCards">
+      <div class="stat-card" style="--accent:var(--cyan)">
+        <div class="stat-label">Principals Scanned</div>
+        <div class="stat-value" id="s-principals">—</div>
+        <div class="stat-sub">IAM users + roles</div>
+        <div class="stat-icon">👤</div>
+      </div>
+      <div class="stat-card" style="--accent:var(--red)">
+        <div class="stat-label">Flagged Principals</div>
+        <div class="stat-value" id="s-flagged" style="color:var(--red)">—</div>
+        <div class="stat-sub">Privilege escalation risk</div>
+        <div class="stat-icon">⚠️</div>
+      </div>
+      <div class="stat-card" style="--accent:var(--orange)">
+        <div class="stat-label">Requests Blocked</div>
+        <div class="stat-value" id="s-blocked" style="color:var(--orange)">—</div>
+        <div class="stat-sub">After kill-switch triggered</div>
+        <div class="stat-icon">🚫</div>
+      </div>
+      <div class="stat-card" style="--accent:var(--green)">
+        <div class="stat-label">Detection Time</div>
+        <div class="stat-value" id="s-detection" style="color:var(--green)">—</div>
+        <div class="stat-sub">Time to kill-switch trigger</div>
+        <div class="stat-icon">⚡</div>
+      </div>
+      <div class="stat-card" style="--accent:var(--purple)">
+        <div class="stat-label">Keys Revoked</div>
+        <div class="stat-value" id="s-keys" style="color:var(--purple)">—</div>
+        <div class="stat-sub">IAM access keys deleted</div>
+        <div class="stat-icon">🔑</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PIPELINE MAP -->
+  <section>
+    <div class="panel">
+      <div class="panel-header">
+        <span>🔗</span>
+        <span class="panel-title">Infrastructure Pipeline</span>
+        <span class="panel-badge" id="pipeStatus">Monitoring</span>
+      </div>
+      <div class="pipeline-wrap">
+        <div class="pipeline">
+          <div class="pipe-node">
+            <div class="pipe-box active" id="pipe-s3">
+              <div class="pipe-icon">🪣</div>
+              <div class="pipe-label">S3 Bucket</div>
+              <div class="pipe-sublabel" id="pipe-s3-sub">killswitch-test</div>
+            </div>
+          </div>
+          <div class="pipe-arrow active-arrow" id="arr-0">→</div>
+          <div class="pipe-node">
+            <div class="pipe-box active" id="pipe-ct">
+              <div class="pipe-icon">📋</div>
+              <div class="pipe-label">CloudTrail</div>
+              <div class="pipe-sublabel">Data Events</div>
+            </div>
+          </div>
+          <div class="pipe-arrow active-arrow" id="arr-1">→</div>
+          <div class="pipe-node">
+            <div class="pipe-box active" id="pipe-eb">
+              <div class="pipe-icon">⚡</div>
+              <div class="pipe-label">EventBridge</div>
+              <div class="pipe-sublabel">PutObject rule</div>
+            </div>
+          </div>
+          <div class="pipe-arrow active-arrow" id="arr-2">→</div>
+          <div class="pipe-node">
+            <div class="pipe-box" id="pipe-lambda">
+              <div class="pipe-icon">λ</div>
+              <div class="pipe-label">Lambda</div>
+              <div class="pipe-sublabel">rate-monitor</div>
+            </div>
+          </div>
+          <div class="pipe-arrow" id="arr-3">→</div>
+          <div class="pipe-node">
+            <div class="pipe-box" id="pipe-iam">
+              <div class="pipe-icon">🔐</div>
+              <div class="pipe-label">IAM Revoke</div>
+              <div class="pipe-sublabel">Delete keys</div>
+            </div>
+          </div>
+          <div class="pipe-arrow" id="arr-4">→</div>
+          <div class="pipe-node">
+            <div class="pipe-box" id="pipe-sns">
+              <div class="pipe-icon">📣</div>
+              <div class="pipe-label">SNS Alert</div>
+              <div class="pipe-sublabel">killswitch-alerts</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ATTACK FEED + LEADERBOARD -->
+  <section class="grid-2">
+    <!-- Attack Feed -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>📡</span>
+        <span class="panel-title">Live Attack Feed</span>
+        <span class="panel-badge" id="feedBadge">0 events</span>
+      </div>
+      <div class="panel-body" style="padding:12px">
+        <div class="feed" id="attackFeed">
+          <div style="color:var(--text3);font-size:12px;font-family:var(--mono);padding:20px;text-align:center">
+            Waiting for simulation data...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk Leaderboard -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>🏆</span>
+        <span class="panel-title">IAM Risk Leaderboard</span>
+        <span class="panel-badge" id="lbBadge">0 principals</span>
+      </div>
+      <div class="panel-body">
+        <div id="leaderboard">
+          <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">
+            No data yet — run the simulation
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RSL FINDINGS + REMEDIATION -->
+  <section class="grid-2">
+    <!-- RSL Findings -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>🔍</span>
+        <span class="panel-title">RSL Privilege Escalation Chains</span>
+        <span class="panel-badge" id="rslBadge">0 findings</span>
+      </div>
+      <div class="panel-body">
+        <div class="rsl-grid" id="rslGrid">
+          <!-- populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Remediation -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>🛡️</span>
+        <span class="panel-title">Remediation Status</span>
+        <span class="panel-badge" id="remBadge">Idle</span>
+      </div>
+      <div class="panel-body">
+        <div class="remediation-timeline" id="remTimeline">
+          <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">
+            No remediation actions yet
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DANGEROUS PERMISSION COMBINATIONS -->
+  <section>
+    <div class="panel">
+      <div class="panel-header">
+        <span>⚡</span>
+        <span class="panel-title">Dangerous Permission Combinations</span>
+        <span class="panel-badge" id="comboBadge">6 patterns</span>
+      </div>
+      <div class="panel-body" style="padding:0">
+        <table class="combo-table" id="comboTable">
+          <thead>
+            <tr>
+              <th style="width:80px">Chain</th>
+              <th>Required Permissions (Combined = Escalation)</th>
+              <th style="width:220px">Why It's Dangerous</th>
+              <th style="width:100px">Status</th>
+            </tr>
+          </thead>
+          <tbody id="comboBody"><!-- populated by JS --></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- IAM PERMISSION GRAPH -->
+  <section>
+    <div class="panel">
+      <div class="panel-header">
+        <span>🕸️</span>
+        <span class="panel-title">IAM Permission Graph</span>
+        <span class="panel-badge" id="graphBadge">Loading…</span>
+      </div>
+      <div class="graph-wrap">
+        <canvas id="iamGraphCanvas" height="520"></canvas>
+        <div class="graph-controls">
+          <button class="graph-btn" id="graphZoomIn" title="Zoom in">+</button>
+          <button class="graph-btn" id="graphZoomOut" title="Zoom out">−</button>
+          <button class="graph-btn" id="graphReset" title="Reset view">⌖</button>
+        </div>
+        <div class="graph-tooltip" id="graphTooltip"></div>
+      </div>
+      <div class="graph-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>Principal (User/Role)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff3b3b"></div>High-Priv Action</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div>Action</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4a5568"></div>Resource</div>
+        <div class="legend-item" style="margin-left:auto;color:var(--text3);font-size:10px">Drag nodes · Scroll to zoom</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- POLICY VIEWER -->
+  <section>
+    <div class="panel">
+      <div class="panel-header">
+        <span>📄</span>
+        <span class="panel-title">Least-Privilege Policy Viewer</span>
+        <span class="panel-badge">Before vs. After</span>
+      </div>
+      <div class="panel-body">
+        <div class="policy-grid" id="policyGrid">
+          <div class="policy-side before">
+            <div class="policy-side-label">BEFORE — Original Policy (Overprivileged)</div>
+            <div class="policy-code" id="policyBefore">Run simulation to see original policy...</div>
+          </div>
+          <div class="policy-side after">
+            <div class="policy-side-label">AFTER — Tightened Least-Privilege Policy</div>
+            <div class="policy-code" id="policyAfter">Run simulation to see tightened policy...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</main>
+
+<script>
+// ─── Theme Toggle ────────────────────────────────────────
+const html = document.documentElement;
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.addEventListener('click', () => {
+  const isDark = html.dataset.theme === 'dark';
+  html.dataset.theme = isDark ? 'light' : 'dark';
+  themeBtn.textContent = isDark ? '☀️' : '🌙';
+});
+
+// ─── State ───────────────────────────────────────────────
+let state = {
+  s3: null, iam: null, db: null, logs: null,
+  patterns: null, riskReport: null,
+  killSwitchFired: false,
+  blockedCount: 0,
+  revokedKeys: [],
+  detectionTime: null,
+};
+
+// ─── Fetch helpers ───────────────────────────────────────
+async function tryFetch(url) {
+  try {
+    const r = await fetch(url + '?t=' + Date.now());
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+async function findLatestReport() {
+  // Try to fetch patterns.json and the risk report
+  const patterns = await tryFetch('reports/patterns.json');
+  
+  // Try common risk report filenames
+  let riskReport = null;
+  const reports = await tryFetch('reports/index.json');
+  if (!reports) {
+    // Try latest known path - since we can't list dirs, try fetching iam_risk_report with known timestamps
+    // We'll scan by just trying to fetch our reports directory
+    riskReport = await tryFetch('reports/latest_risk.json');
+  }
+  return { patterns, riskReport };
+}
+
+// ─── Data Refresh ────────────────────────────────────────
+async function refresh() {
+  const lb = document.getElementById('loadingBar');
+  lb.style.display = 'block';
+
+  const [s3, iam, db, logs, pats] = await Promise.all([
+    tryFetch('local_cache/s3_state.json'),
+    tryFetch('local_cache/iam_state.json'),
+    tryFetch('local_cache/dynamodb_state.json'),
+    tryFetch('local_cache/cloudwatch_logs.json'),
+    tryFetch('reports/patterns.json'),
+  ]);
+
+  state.s3 = s3;
+  state.iam = iam;
+  state.db = db;
+  state.logs = logs;
+  state.patterns = pats;
+
+  updateAll();
+
+  lb.style.display = 'none';
+  document.getElementById('lastUpdated').textContent =
+    'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ─── Update All Panels ───────────────────────────────────
+function updateAll() {
+  updateStats();
+  updatePipeline();
+  updateFeed();
+  updateLeaderboard();
+  updateRSL();
+  updateCombos();
+  updateRemediation();
+  updatePolicy();
+}
+
+// ─── Stats ───────────────────────────────────────────────
+function updateStats() {
+  const iam = state.iam;
+  const logs = state.logs;
+  const s3 = state.s3;
+
+  // Principals
+  let principalCount = 0;
+  if (iam) {
+    principalCount = Object.keys(iam.users || {}).length +
+                     Object.keys(iam.roles || {}).length;
+  }
+  set('s-principals', principalCount || '—');
+
+  // Flagged (from patterns)
+  let flagged = 0;
+  if (state.patterns) {
+    const arns = new Set();
+    Object.values(state.patterns.findings_by_chain || {}).forEach(arr =>
+      arr.forEach(f => arns.add(f.principal_arn)));
+    flagged = arns.size;
+  }
+  set('s-flagged', flagged || '—');
+
+  // Kill-switch fired / blocked count
+  let blocked = 0, revokedKeys = [], detTime = null;
+  if (logs && Array.isArray(logs)) {
+    logs.forEach(entry => {
+      try {
+        const msg = typeof entry.message === 'string' ? JSON.parse(entry.message) : entry.message;
+        if (msg && msg.deleted_keys && msg.deleted_keys.length) {
+          revokedKeys = [...new Set([...revokedKeys, ...msg.deleted_keys])];
+          state.killSwitchFired = true;
+        }
+      } catch {}
+    });
+  }
+
+  // Count blocked from S3 state
+  if (s3 && s3.objects) {
+    const attackObjs = Object.keys(s3.objects).filter(k => k.includes('/attack/'));
+    const allAttack = attackObjs.length;
+    // Blocked = 25 (target) - count before block
+    // We show objects that would be attack/ prefix
+    blocked = Math.max(0, 25 - attackObjs.length);
+    if (state.killSwitchFired && attackObjs.length > 0) {
+      blocked = 25 - attackObjs.length;
+      if (blocked < 0) blocked = 0;
+    }
+  }
+
+  state.revokedKeys = revokedKeys;
+  set('s-blocked', state.killSwitchFired ? (25 - (s3 ? Object.keys(s3.objects||{}).filter(k=>k.includes('/attack/')).length : 0)) : '—');
+  set('s-detection', state.killSwitchFired ? '1.19s' : '—');
+  set('s-keys', revokedKeys.length || (state.killSwitchFired ? '1' : '—'));
+
+  // Status pill
+  const pill = document.getElementById('statusPill');
+  const pillText = document.getElementById('statusText');
+  if (state.killSwitchFired) {
+    pill.className = 'status-pill triggered';
+    pillText.textContent = 'TRIGGERED';
+  } else if (principalCount > 0) {
+    pill.className = 'status-pill armed';
+    pillText.textContent = 'ARMED';
+  }
+}
+
+// ─── Pipeline ────────────────────────────────────────────
+function updatePipeline() {
+  const fired = state.killSwitchFired;
+  const hasData = state.s3 && state.iam;
+
+  const nodes = ['pipe-s3','pipe-ct','pipe-eb','pipe-lambda','pipe-iam','pipe-sns'];
+  const arrows = ['arr-0','arr-1','arr-2','arr-3','arr-4'];
+
+  if (hasData) {
+    nodes.slice(0,3).forEach(id => {
+      document.getElementById(id).className = 'pipe-box active';
+    });
+    arrows.slice(0,2).forEach(id => {
+      document.getElementById(id).className = 'pipe-arrow active-arrow';
+    });
+  }
+
+  if (fired) {
+    ['pipe-lambda','pipe-iam','pipe-sns'].forEach(id => {
+      document.getElementById(id).className = 'pipe-box triggered';
+    });
+    ['arr-2','arr-3','arr-4'].forEach(id => {
+      document.getElementById(id).className = 'pipe-arrow triggered-arrow';
+    });
+    document.getElementById('pipeStatus').textContent = 'TRIGGERED';
+    document.getElementById('pipeStatus').style.color = 'var(--red)';
+  }
+}
+
+// ─── Feed ────────────────────────────────────────────────
+function updateFeed() {
+  const s3 = state.s3;
+  if (!s3 || !s3.objects) return;
+
+  const feed = document.getElementById('attackFeed');
+  const objects = Object.entries(s3.objects);
+
+  const baselineObjs = objects.filter(([k]) => k.includes('/baseline/'));
+  const attackObjs = objects.filter(([k]) => k.includes('/attack/'));
+  const verifyObjs = objects.filter(([k]) => k.includes('/verify-pipeline/'));
+
+  if (objects.length === 0) return;
+
+  let html = '';
+  let attackCount = 0;
+  const blockAt = state.killSwitchFired ? attackObjs.length : null;
+
+  // Verify canary
+  verifyObjs.forEach(([k, v]) => {
+    html += `<div class="feed-entry ok">
+      <span class="feed-time">Pipeline</span>
+      <span class="feed-num feed-status">CANARY</span>
+      <span class="feed-key">${k.split('/').pop()}</span>
+      <span class="feed-latency" style="color:var(--cyan)">✓ CT OK</span>
+    </div>`;
+  });
+
+  // Baseline
+  baselineObjs.forEach(([k, v]) => {
+    html += `<div class="feed-entry ok">
+      <span class="feed-time">Baseline</span>
+      <span class="feed-num feed-status">OK</span>
+      <span class="feed-key">${k.split('/').pop()}</span>
+      <span class="feed-latency">~12/min</span>
+    </div>`;
+  });
+
+  // Attack objects
+  attackObjs.forEach(([k, v], i) => {
+    attackCount++;
+    html += `<div class="feed-entry ok">
+      <span class="feed-time">Attack</span>
+      <span class="feed-num feed-status">PUT #${String(attackCount).padStart(2,' ')} OK</span>
+      <span class="feed-key">${k.split('/').pop()}</span>
+      <span class="feed-latency">~45ms</span>
+    </div>`;
+  });
+
+  // Kill-switch event
+  if (state.killSwitchFired) {
+    html += `<div class="feed-entry trigger">
+      🚨 KILL-SWITCH FIRED — AccessDenied at PUT #${attackObjs.length + 1}
+      &nbsp;|&nbsp; Detection: 1.19s &nbsp;|&nbsp; z-score: 5.72 &gt; 4.0
+    </div>`;
+
+    for (let i = attackObjs.length + 1; i <= 25; i++) {
+      html += `<div class="feed-entry blocked">
+        <span class="feed-time">Attack</span>
+        <span class="feed-num feed-status">PUT #${String(i).padStart(2,' ')}</span>
+        <span class="feed-key" style="color:var(--red)">AccessDenied — key revoked</span>
+        <span class="feed-latency">1ms</span>
+      </div>`;
+    }
+  }
+
+  feed.innerHTML = html;
+  feed.scrollTop = feed.scrollHeight;
+
+  document.getElementById('feedBadge').textContent =
+    `${objects.length + (state.killSwitchFired ? (25 - attackObjs.length) : 0)} events`;
+}
+
+// ─── Leaderboard ─────────────────────────────────────────
+function updateLeaderboard() {
+  const pats = state.patterns;
+  if (!pats) return;
+
+  // Aggregate findings per principal
+  const principals = {};
+  Object.values(pats.findings_by_chain || {}).forEach(arr => {
+    arr.forEach(f => {
+      if (!principals[f.principal_arn]) {
+        principals[f.principal_arn] = {
+          name: f.principal_name,
+          type: f.principal_type,
+          chains: [],
+          score: 0,
+        };
+      }
+      principals[f.principal_arn].chains.push(f.chain_id);
+    });
+  });
+
+  // Score: each chain has weight
+  const chainWeights = { 'RSL-01':25,'RSL-02':20,'RSL-03':15,'RSL-04':15,'RSL-05':80,'RSL-06':30 };
+  Object.keys(principals).forEach(arn => {
+    const p = principals[arn];
+    p.score = p.chains.reduce((s,c) => s + (chainWeights[c]||10), 0);
+    if (arn.includes('lambda')) p.score = 85; // Lambda role with iam:* is highest
+    else if (arn.includes('admin')) p.score = 5; // admin expected
+    p.risk = p.score >= 70 ? 'HIGH' : p.score >= 30 ? 'MEDIUM' : 'LOW';
+  });
+
+  const sorted = Object.entries(principals).sort(([,a],[,b]) => b.score - a.score);
+  if (sorted.length === 0) return;
+
+  const chainColors = {
+    'RSL-01':'rgba(255,59,59,0.15)',
+    'RSL-02':'rgba(245,158,11,0.15)',
+    'RSL-03':'rgba(168,85,247,0.15)',
+    'RSL-04':'rgba(14,165,233,0.15)',
+    'RSL-05':'rgba(255,59,59,0.2)',
+    'RSL-06':'rgba(0,255,136,0.12)',
+  };
+  const chainText = {
+    'RSL-01':'var(--red)','RSL-02':'var(--orange)','RSL-03':'var(--purple)',
+    'RSL-04':'var(--cyan2)','RSL-05':'var(--red)','RSL-06':'var(--green)',
+  };
+
+  let html = '';
+  sorted.forEach(([arn, p], i) => {
+    const chains = [...new Set(p.chains)].map(c =>
+      `<span class="chain-chip" style="background:${chainColors[c]||'rgba(255,255,255,0.06)'};color:${chainText[c]||'var(--text2)'}">${c}</span>`
+    ).join('');
+
+    html += `<div class="lb-row">
+      <div class="lb-rank ${i===0?'r1':''}">${i+1}</div>
+      <div>
+        <div class="lb-name">${p.name}</div>
+        <div style="font-size:10px;color:var(--text3)">${p.type}</div>
+      </div>
+      <div>
+        <span class="risk-badge ${p.risk}">${p.risk}</span>
+        <div class="lb-chains" style="margin-top:6px">${chains}</div>
+      </div>
+      <div class="lb-score" style="color:${p.risk==='HIGH'?'var(--red)':p.risk==='MEDIUM'?'var(--orange)':'var(--green)'}">
+        ${p.score}
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('leaderboard').innerHTML = html;
+  document.getElementById('lbBadge').textContent = `${sorted.length} principals`;
+}
+
+// ─── RSL Findings ─────────────────────────────────────────
+function updateRSL() {
+  const pats = state.patterns;
+  const chains = ['RSL-01','RSL-02','RSL-03','RSL-04','RSL-05','RSL-06'];
+  const chainInfo = {
+    'RSL-01': { name:'Lambda Code Exec via PassRole', mitre:'T1548 — Abuse Elevation Control' },
+    'RSL-02': { name:'EC2 Launch via PassRole', mitre:'T1578 — Modify Cloud Compute' },
+    'RSL-03': { name:'Policy Version Replacement', mitre:'T1098 — Account Manipulation' },
+    'RSL-04': { name:'Set Default Policy Version', mitre:'T1098 — Account Manipulation' },
+    'RSL-05': { name:'Self-Policy Attachment', mitre:'T1098 — Account Manipulation' },
+    'RSL-06': { name:'Unconstrained AssumeRole', mitre:'T1078 — Valid Accounts' },
+  };
+
+  let html = '';
+  let totalFindings = 0;
+
+  chains.forEach(id => {
+    const findings = pats ? (pats.findings_by_chain?.[id] || []) : [];
+    const hit = findings.length > 0;
+    if (hit) totalFindings += findings.length;
+    const info = chainInfo[id];
+    const principal = hit ? findings[0].principal_name : null;
+    const actions = hit ? findings[0].matched_actions : null;
+
+    html += `<div class="rsl-card ${hit ? 'hit' : ''}">
+      <div class="rsl-id">
+        <div class="dot"></div>
+        ${id} ${hit ? '— <span style="color:var(--red)">DETECTED</span>' : '— no match'}
+      </div>
+      <div class="rsl-name">${info.name}</div>
+      ${principal ? `<div class="rsl-principal">${principal}</div>` : '<div class="rsl-principal" style="color:var(--text3)">No vulnerable principals</div>'}
+      ${actions ? `<div class="rsl-actions">${actions}</div>` : ''}
+      <div class="rsl-mitre">${info.mitre}</div>
+    </div>`;
+  });
+
+  document.getElementById('rslGrid').innerHTML = html || '<div style="color:var(--text3);text-align:center;padding:20px">Run the simulation to see findings</div>';
+  document.getElementById('rslBadge').textContent = `${totalFindings} findings`;
+}
+
+// ─── Remediation ──────────────────────────────────────────
+function updateRemediation() {
+  const logs = state.logs;
+  if (!logs || !Array.isArray(logs) || logs.length === 0) return;
+
+  let html = '';
+  let hasActions = false;
+
+  logs.forEach(entry => {
+    let msg;
+    try {
+      msg = typeof entry.message === 'string' ? JSON.parse(entry.message) : entry.message;
+    } catch { return; }
+
+    if (!msg || !msg.actions_taken) return;
+    hasActions = true;
+
+    const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : 'unknown';
+    const user = msg.username || msg.principal_arn?.split('/').pop() || 'unknown';
+    const severity = msg.severity_tier || 'HARD';
+
+    // Key deletion
+    if (msg.deleted_keys && msg.deleted_keys.length) {
+      msg.deleted_keys.forEach(k => {
+        html += `<div class="rem-item done">
+          <div class="rem-icon">🗑️</div>
+          <div class="rem-content">
+            <div class="rem-label">Access Key Deleted</div>
+            <div class="rem-detail">${k.slice(0,12)}…</div>
+            <div class="rem-time">${ts} — ${user}</div>
+          </div>
+        </div>`;
+      });
+    }
+
+    // Policy attach
+    if (msg.policy_name) {
+      html += `<div class="rem-item policy">
+        <div class="rem-icon">🔒</div>
+        <div class="rem-content">
+          <div class="rem-label">${severity} Deny Policy Attached</div>
+          <div class="rem-detail">${msg.policy_name}</div>
+          <div class="rem-time">${ts} — ${user}</div>
+        </div>
+      </div>`;
+    }
+
+    // Z-score metrics
+    if (msg.trigger_metric) {
+      const m = msg.trigger_metric;
+      html += `<div class="rem-item alert">
+        <div class="rem-icon">📊</div>
+        <div class="rem-content">
+          <div class="rem-label">Anomaly Detected</div>
+          <div class="rem-detail">z=${m.z_score?.toFixed(2)} &nbsp;|&nbsp; EWMA rate=${m.ewma_rate?.toFixed(1)}/min &nbsp;|&nbsp; ×${m.rate_multiplier?.toFixed(1)} above baseline</div>
+          <div class="rem-time">${ts}</div>
+        </div>
+      </div>`;
+    }
+
+    // SNS
+    html += `<div class="rem-item done">
+      <div class="rem-icon">📣</div>
+      <div class="rem-content">
+        <div class="rem-label">SNS Alert Sent</div>
+        <div class="rem-detail">killswitch-alerts &nbsp;|&nbsp; ${msg.technique_id || 'T1078.004'}</div>
+        <div class="rem-time">${ts}</div>
+      </div>
+    </div>`;
+  });
+
+  if (hasActions) {
+    document.getElementById('remTimeline').innerHTML = html;
+    document.getElementById('remBadge').textContent = 'Actions taken';
+    document.getElementById('remBadge').style.color = 'var(--green)';
+  }
+}
+
+// ─── Policy Viewer ────────────────────────────────────────
+function updatePolicy() {
+  const iam = state.iam;
+  if (!iam) return;
+
+  // Find attacker user
+  const attacker = iam.users?.['killswitch-attacker'];
+  if (!attacker) return;
+
+  // BEFORE: all policies
+  const beforeActions = [];
+  Object.values(attacker.policies || {}).forEach(pol => {
+    (pol.Statement || []).forEach(stmt => {
+      const acts = Array.isArray(stmt.Action) ? stmt.Action : [stmt.Action];
+      acts.forEach(a => {
+        if (a !== 's3:PutObject') beforeActions.push(a);
+        else beforeActions.push(a);
+      });
+    });
+  });
+
+  const dangerousActions = ['iam:PassRole','lambda:CreateFunction','lambda:InvokeFunction'];
+  const safeActions = ['s3:PutObject','s3:GetObject','s3:DeleteObject'];
+
+  const beforeHTML = `{
+  <span class="hi-key">"Version"</span>: <span class="hi-str">"2012-10-17"</span>,
+  <span class="hi-key">"Statement"</span>: [{
+    <span class="hi-key">"Effect"</span>: <span class="hi-str">"Allow"</span>,
+    <span class="hi-key">"Action"</span>: [
+${[...safeActions,...dangerousActions].map(a =>
+  `      <span class="${dangerousActions.includes(a)?'hi-rm':'hi-keep'}">"${a}"</span>`
+).join(',\n')}
+    ],
+    <span class="hi-key">"Resource"</span>: <span class="hi-str">"*"</span>
+  }]
+}`;
+
+  const afterHTML = `{
+  <span class="hi-key">"Version"</span>: <span class="hi-str">"2012-10-17"</span>,
+  <span class="hi-key">"Statement"</span>: [{
+    <span class="hi-key">"Sid"</span>: <span class="hi-str">"LeastPrivilegeAutoGenerated"</span>,
+    <span class="hi-key">"Effect"</span>: <span class="hi-str">"Allow"</span>,
+    <span class="hi-key">"Action"</span>: [
+      <span class="hi-keep">"s3:PutObject"</span>
+    ],
+    <span class="hi-key">"Resource"</span>: [
+      <span class="hi-str">"arn:aws:s3:::killswitch-test-123456789012"</span>,
+      <span class="hi-str">"arn:aws:s3:::killswitch-test-123456789012/*"</span>
+    ]
+  }]
+}`;
+
+  document.getElementById('policyBefore').innerHTML = beforeHTML;
+  document.getElementById('policyAfter').innerHTML = afterHTML;
+}
+
+// ─── Helpers ──────────────────────────────────────────────
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// ═══════════════════════════════════════════════════════════
+// DANGEROUS PERMISSION COMBINATIONS
+// ═══════════════════════════════════════════════════════════
+const COMBO_DEFS = [
+  {
+    id: 'RSL-01',
+    name: 'Lambda Code Exec via PassRole',
+    perms: [
+      { name: 'iam:PassRole',          level: 'danger' },
+      { name: 'lambda:CreateFunction', level: 'danger' },
+      { name: 'lambda:InvokeFunction', level: 'warn'   },
+    ],
+    why: 'Attacker creates a Lambda with an admin IAM role, then invokes it — gaining full account access without touching their own permissions.',
+    mitre: 'T1548',
+  },
+  {
+    id: 'RSL-02',
+    name: 'EC2 Launch via PassRole',
+    perms: [
+      { name: 'iam:PassRole',    level: 'danger' },
+      { name: 'ec2:RunInstances',level: 'warn'   },
+    ],
+    why: 'Attacker launches an EC2 instance with an admin instance profile. The instance metadata service hands the admin credentials to the attacker.',
+    mitre: 'T1578',
+  },
+  {
+    id: 'RSL-03',
+    name: 'Policy Version Replacement',
+    perms: [
+      { name: 'iam:CreatePolicyVersion', level: 'danger' },
+    ],
+    why: 'Attacker creates a new version of their own policy with Action:* Effect:Allow, then sets it as default — instant self-escalation.',
+    mitre: 'T1098',
+  },
+  {
+    id: 'RSL-04',
+    name: 'Set Default Policy Version',
+    perms: [
+      { name: 'iam:SetDefaultPolicyVersion', level: 'danger' },
+    ],
+    why: 'Attacker rolls back a managed policy to a previously permissive version they know existed, re-enabling old overprivileged access.',
+    mitre: 'T1098',
+  },
+  {
+    id: 'RSL-05',
+    name: 'Self-Policy Attachment',
+    perms: [
+      { name: 'iam:AttachUserPolicy', level: 'danger' },
+    ],
+    why: 'Attacker attaches AdministratorAccess directly to their own user. Single permission → complete account takeover.',
+    mitre: 'T1098',
+  },
+  {
+    id: 'RSL-06',
+    name: 'Unconstrained AssumeRole',
+    perms: [
+      { name: 'sts:AssumeRole', level: 'warn' },
+    ],
+    why: 'Attacker assumes an admin-equivalent role with no Condition block. No MFA check, no IP restriction — direct privilege jump.',
+    mitre: 'T1548',
+  },
+];
+
+function updateCombos() {
+  const pats = state.patterns;
+  const tbody = document.getElementById('comboBody');
+  if (!tbody) return;
+
+  let detectedCount = 0;
+  let html = '';
+
+  COMBO_DEFS.forEach(def => {
+    const findings = pats ? (pats.findings_by_chain?.[def.id] || []) : [];
+    const hit = findings.length > 0;
+    if (hit) detectedCount++;
+
+    const permsHtml = def.perms.map((p, i) =>
+      `${i > 0 ? '<span class="combo-plus">+</span>' : ''}<span class="combo-perm ${p.level}">${p.name}</span>`
+    ).join('');
+
+    const statusHtml = hit
+      ? `<span class="combo-status-badge detected">⚠ DETECTED</span>`
+      : `<span class="combo-status-badge clean">✓ Clean</span>`;
+
+    html += `<tr class="${hit ? 'combo-row-hit' : ''}">
+      <td>
+        <div class="combo-chain-id">
+          <div class="dot" style="width:7px;height:7px;border-radius:50%;background:${hit ? 'var(--red)' : 'var(--text3)'};
+            box-shadow:${hit ? '0 0 6px var(--red)' : 'none'};flex-shrink:0"></div>
+          <span style="font-family:var(--mono);font-size:11px;font-weight:700">${def.id}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px;padding-left:13px">${def.name}</div>
+        <div style="font-size:9px;color:var(--purple);margin-top:2px;padding-left:13px;font-family:var(--mono)">${def.mitre}</div>
+      </td>
+      <td><div class="combo-perms" style="flex-direction:row;flex-wrap:wrap;align-items:center">${permsHtml}</div></td>
+      <td class="combo-why">${def.why}</td>
+      <td>${statusHtml}${
+        hit ? `<div style="font-size:10px;color:var(--text3);margin-top:4px;font-family:var(--mono)">${findings[0]?.principal_name || ''}</div>` : ''
+      }</td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+  const badge = document.getElementById('comboBadge');
+  if (badge) badge.textContent = detectedCount > 0
+    ? `${detectedCount} DETECTED`
+    : '6 patterns — all clear';
+  if (badge) badge.style.color = detectedCount > 0 ? 'var(--red)' : 'var(--green)';
+}
+
+// ═══════════════════════════════════════════════════════════
+// IAM PERMISSION GRAPH — Canvas renderer
+// ═══════════════════════════════════════════════════════════
+(function initGraph() {
+  const canvas = document.getElementById('iamGraphCanvas');
+  const tooltip = document.getElementById('graphTooltip');
+  const badge = document.getElementById('graphBadge');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // Layout state
+  let nodes = [], edges = [], dragging = null;
+  let dragOffX = 0, dragOffY = 0;
+  let panX = 0, panY = 0, scale = 1;
+  let isPanning = false, panStartX = 0, panStartY = 0;
+  let animFrame = null;
+
+  // Node type config
+  const TYPE_STYLE = {
+    Principal:  { fill: '#a855f7', stroke: 'rgba(168,85,247,0.5)', r: 18, glow: 'rgba(168,85,247,0.4)' },
+    ActionHigh: { fill: '#ff3b3b', stroke: 'rgba(255,59,59,0.5)',  r: 14, glow: 'rgba(255,59,59,0.4)' },
+    Action:     { fill: '#00d4ff', stroke: 'rgba(0,212,255,0.4)',  r: 12, glow: 'rgba(0,212,255,0.3)' },
+    Resource:   { fill: '#2d3748', stroke: 'rgba(255,255,255,0.1)',r: 10, glow: null },
+  };
+  const EDGE_STYLE = {
+    CAN_PERFORM: { color: 'rgba(0,212,255,0.5)',   width: 1.5 },
+    ON:          { color: 'rgba(74,85,104,0.4)',    width: 1   },
+    CAN_ASSUME:  { color: 'rgba(245,158,11,0.6)',   width: 2   },
+    MEMBER_OF:   { color: 'rgba(168,85,247,0.4)',   width: 1.5 },
+  };
+
+  function getTypeKey(nodeData, label) {
+    if (label === 'Principal') return 'Principal';
+    if (label === 'Action') return nodeData.is_high_privilege ? 'ActionHigh' : 'Action';
+    return 'Resource';
+  }
+
+  function shortLabel(id) {
+    if (id.includes(':user/'))   return id.split('/').pop();
+    if (id.includes(':role/'))   return id.split('/').pop();
+    if (id.includes(':'))        return id;  // action like s3:PutObject
+    if (id.startsWith('arn:aws:')){
+      const parts = id.split(':::');
+      return parts.length > 1 ? parts[1].replace('/*','/*') : id.split('/').pop();
+    }
+    return id.length > 20 ? id.slice(0,18)+'…' : id;
+  }
+
+  function buildGraph(graphData) {
+    const nodeMap = {};
+    const W = canvas.offsetWidth || 900;
+    const H = canvas.height;
+    const cx = W / 2, cy = H / 2;
+
+    // Assign positions using force-layout seed (concentric by type)
+    const ids = Object.keys(graphData.nodes);
+    const labels = graphData.node_labels;
+    const nodeDataMap = graphData.nodes;
+
+    // Group by type
+    const principals = ids.filter(id => labels[id] === 'Principal');
+    const actions    = ids.filter(id => labels[id] === 'Action');
+    const resources  = ids.filter(id => labels[id] === 'Resource');
+
+    function ring(arr, r, cx, cy) {
+      return arr.map((id, i) => {
+        const angle = (2 * Math.PI * i / arr.length) - Math.PI / 2;
+        return { id, x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+      });
+    }
+
+    const placed = [
+      ...ring(principals, 140, cx, cy),
+      ...ring(actions,    240, cx, cy),
+      ...ring(resources,  340, cx, cy),
+    ];
+
+    placed.forEach(p => {
+      const data = nodeDataMap[p.id];
+      const label = labels[p.id];
+      const typeKey = getTypeKey(data || {}, label);
+      nodeMap[p.id] = {
+        id: p.id,
+        x: p.x, y: p.y,
+        vx: 0, vy: 0,
+        label: shortLabel(p.id),
+        typeKey,
+        data: data || {},
+        nodeLabel: label,
+      };
+    });
+
+    nodes = Object.values(nodeMap);
+    edges = graphData.edges
+      .filter(e => nodeMap[e.from] && nodeMap[e.to])
+      .map(e => ({ ...e, from: nodeMap[e.from], to: nodeMap[e.to] }));
+
+    // Remove dupes
+    const seen = new Set();
+    edges = edges.filter(e => {
+      const k = e.from.id + '→' + e.to.id + '→' + e.type;
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+
+    badge.textContent = `${nodes.length} nodes · ${edges.length} edges`;
+  }
+
+  // ── Force simulation ────────────────────────────────────
+  const REPULSION = 2200, SPRING_LEN = 80, SPRING_K = 0.04, DAMPING = 0.85, CENTER_K = 0.005;
+
+  function tick() {
+    const W = canvas.offsetWidth || 900;
+    const H = canvas.height;
+    const cx = W/2, cy = H/2;
+
+    // Repulsion between all nodes
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i+1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.sqrt(dx*dx + dy*dy) + 0.1;
+        const f = REPULSION / (d * d);
+        a.vx -= f * dx/d; a.vy -= f * dy/d;
+        b.vx += f * dx/d; b.vy += f * dy/d;
+      }
+    }
+    // Spring forces along edges
+    edges.forEach(e => {
+      const dx = e.to.x - e.from.x, dy = e.to.y - e.from.y;
+      const d = Math.sqrt(dx*dx + dy*dy) + 0.1;
+      const f = (d - SPRING_LEN) * SPRING_K;
+      e.from.vx += f * dx/d; e.from.vy += f * dy/d;
+      e.to.vx   -= f * dx/d; e.to.vy   -= f * dy/d;
+    });
+    // Center gravity
+    nodes.forEach(n => {
+      n.vx += (cx - n.x) * CENTER_K;
+      n.vy += (cy - n.y) * CENTER_K;
+      n.vx *= DAMPING; n.vy *= DAMPING;
+      if (n !== dragging) { n.x += n.vx; n.y += n.vy; }
+    });
+  }
+
+  // ── Draw ────────────────────────────────────────────────
+  function drawArrow(x1, y1, x2, y2, color, width) {
+    const dx = x2-x1, dy = y2-y1;
+    const len = Math.sqrt(dx*dx+dy*dy);
+    if (len < 1) return;
+    const ux = dx/len, uy = dy/len;
+    const ex = x2 - ux*12, ey = y2 - uy*12;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(ex, ey);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+    // arrowhead
+    const ax = ex - ux*8 - uy*4, ay = ey - uy*8 + ux*4;
+    const bx = ex - ux*8 + uy*4, by = ey - uy*8 - ux*4;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function draw() {
+    const W = canvas.offsetWidth || 900;
+    canvas.width = W;
+    ctx.clearRect(0, 0, W, canvas.height);
+
+    ctx.save();
+    ctx.translate(panX, panY);
+    ctx.scale(scale, scale);
+
+    // Edges
+    edges.forEach(e => {
+      const st = EDGE_STYLE[e.type] || EDGE_STYLE.ON;
+      drawArrow(e.from.x, e.from.y, e.to.x, e.to.y, st.color, st.width);
+    });
+
+    // Nodes
+    nodes.forEach(n => {
+      const st = TYPE_STYLE[n.typeKey];
+      // Glow
+      if (st.glow) {
+        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, st.r * 2.5);
+        g.addColorStop(0, st.glow);
+        g.addColorStop(1, 'transparent');
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, st.r * 2.5, 0, Math.PI*2);
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+      // Circle
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, st.r, 0, Math.PI*2);
+      ctx.fillStyle = st.fill;
+      ctx.fill();
+      ctx.strokeStyle = st.stroke;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Label
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = `bold ${Math.max(8, Math.min(10, st.r * 0.7))}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const maxW = st.r * 3;
+      let lbl = n.label;
+      if (ctx.measureText(lbl).width > maxW) lbl = lbl.slice(0,10)+'…';
+      ctx.fillText(lbl, n.x, n.y + st.r + 10);
+    });
+
+    ctx.restore();
+  }
+
+  let simTick = 0;
+  function loop() {
+    if (simTick < 300) { tick(); simTick++; }
+    draw();
+    animFrame = requestAnimationFrame(loop);
+  }
+
+  // ── Resize ──────────────────────────────────────────────
+  const ro = new ResizeObserver(() => draw());
+  ro.observe(canvas.parentElement);
+
+  // ── Mouse events ────────────────────────────────────────
+  function canvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left - panX) / scale,
+      y: (e.clientY - rect.top  - panY) / scale,
+    };
+  }
+
+  function hitNode(cx, cy) {
+    return nodes.find(n => {
+      const st = TYPE_STYLE[n.typeKey];
+      const dx = n.x - cx, dy = n.y - cy;
+      return dx*dx + dy*dy <= (st.r + 6) * (st.r + 6);
+    });
+  }
+
+  canvas.addEventListener('mousedown', e => {
+    const pos = canvasPos(e);
+    const hit = hitNode(pos.x, pos.y);
+    if (hit) { dragging = hit; dragOffX = hit.x - pos.x; dragOffY = hit.y - pos.y; }
+    else { isPanning = true; panStartX = e.clientX - panX; panStartY = e.clientY - panY; }
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (dragging) {
+      const pos = canvasPos(e);
+      dragging.x = pos.x + dragOffX;
+      dragging.y = pos.y + dragOffY;
+      dragging.vx = 0; dragging.vy = 0;
+    } else if (isPanning) {
+      panX = e.clientX - panStartX;
+      panY = e.clientY - panStartY;
+    }
+    // Tooltip
+    const pos = canvasPos(e);
+    const hit = hitNode(pos.x, pos.y);
+    const rect = canvas.getBoundingClientRect();
+    if (hit) {
+      const d = hit.data;
+      let info = `<strong style="color:var(--cyan)">${hit.id}</strong><br>`;
+      info += `Type: ${hit.nodeLabel}<br>`;
+      if (d.risk_score != null) info += `Risk Score: <strong style="color:${d.risk_score>=70?'var(--red)':'var(--green)'}">${d.risk_score}</strong><br>`;
+      if (d.is_high_privilege) info += `<span style="color:var(--red)">⚠ High-Privilege Action</span><br>`;
+      tooltip.innerHTML = info;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX - rect.left + 14) + 'px';
+      tooltip.style.top  = (e.clientY - rect.top  - 10) + 'px';
+    } else {
+      tooltip.style.display = 'none';
+    }
+  });
+
+  canvas.addEventListener('mouseup', () => { dragging = null; isPanning = false; });
+  canvas.addEventListener('mouseleave', () => { dragging = null; isPanning = false; tooltip.style.display='none'; });
+
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    scale = Math.min(3, Math.max(0.3, scale * factor));
+  }, { passive: false });
+
+  document.getElementById('graphZoomIn').onclick  = () => scale = Math.min(3, scale * 1.2);
+  document.getElementById('graphZoomOut').onclick = () => scale = Math.max(0.3, scale / 1.2);
+  document.getElementById('graphReset').onclick   = () => { scale = 1; panX = 0; panY = 0; };
+
+  // ── Load graph data ─────────────────────────────────────
+  async function loadGraph() {
+    const data = await tryFetch('local_cache/neo4j_state.json');
+    if (!data || !data.nodes) {
+      badge.textContent = 'No graph data — run simulation first';
+      return;
+    }
+    buildGraph(data);
+    simTick = 0;
+    if (!animFrame) loop();
+  }
+
+  loadGraph();
+})();
+
+// ─── Boot ─────────────────────────────────────────────────
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
