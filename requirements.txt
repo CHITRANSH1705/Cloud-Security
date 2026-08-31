@@ -13,7 +13,6 @@ python-dotenv>=1.0.0
 
 # CLI output formatting
 rich>=13.7.0
-
 # Statistical utilities (used in EWMA calculations)
 # Note: stdlib math module is used for sqrt; this is for any future extensions
 # numpy is intentionally excluded — we implement EWMA from scratch to keep
