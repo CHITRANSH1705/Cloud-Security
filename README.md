@@ -17,7 +17,7 @@ and real IAM graph analysis — running end-to-end against an AWS sandbox accoun
 | 3 | Escalation chain detection (RSL-01–06) |  Live | 6 Rhino Security Labs chains as Cypher queries |
 | 3 | Risk scoring → kill-switch integration |  Live | Scores written to Neo4j + DynamoDB; Lambda reads DDB |
 | 4 | Sandbox exploitability test |  Not built | `escalation_test.py` has explicit `NotImplementedError` |
-| 4 | Least-privilege policy generator | ⛔ Not built | `remediate.py` has explicit `NotImplementedError` |
+| 4 | Least-privilege policy generator | Not built | `remediate.py` has explicit `NotImplementedError` |
 
 **Every feature listed as Live runs end-to-end against a real AWS account — no stub detections.**
 **Phases 1–3 were prioritized to completion; Phase 4 was explicitly cut, not silently stubbed.**
