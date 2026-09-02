@@ -4,9 +4,6 @@ A portfolio-grade cloud security system demonstrating real detection, real remed
 and real IAM graph analysis — running end-to-end against an AWS sandbox account.
 
 ---
-
-
-
 ## Phase Status (honest scope statement)
 
 | Phase | Component | Status | Notes |
