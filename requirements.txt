@@ -1,6 +1,4 @@
 # Cloud Ransomware Kill-Switch & IAM Permission-Toxicity Detector
-# Python 3.11+
-
 # AWS SDK
 boto3>=1.34.0
 botocore>=1.34.0
