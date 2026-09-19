@@ -9,8 +9,6 @@ neo4j>=5.18.0
 # Environment variable management
 python-dotenv>=1.0.0
 
-
-
 # CLI output formatting
 rich>=13.7.0
 # Statistical utilities (used in EWMA calculations)
