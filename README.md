@@ -6,8 +6,6 @@ and real IAM graph analysis — running end-to-end against an AWS sandbox accoun
 ---
 ## Phase Status (honest scope statement)
 
-
-
 | Phase | Component | Status | Notes |
 |---|---|---|---|
 | 1 | Infrastructure provisioning |  Live | `infra/setup.py` + `infra/verify_pipeline.py` |
