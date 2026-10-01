@@ -15,7 +15,6 @@ from pathlib import Path
 # Reconfigure stdout and stderr to use UTF-8 encoding on Windows to prevent UnicodeEncodeError
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
-
 # Clear existing cache files to ensure a clean run
 WORKSPACE_ROOT = Path(__file__).parent
 LOCAL_CACHE_DIR = WORKSPACE_ROOT / "local_cache"
